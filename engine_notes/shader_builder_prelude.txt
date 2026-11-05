@@ -1,0 +1,531 @@
+@855000 moveTo
+@855008 changeFarClipImmediate
+@855020 changeNearClipImmediate
+@855038 changeFieldOfViewImmediate
+@855054 changeFarClip
+@855064 changeNearClip
+@855074 changeFieldOfView
+@855088 rotateToImmediate
+@85509c rotateTo
+@8550a8 rotateRight
+@8550b4 rotateLeft
+@8550c0 pitchToImmediate
+@8550d4 pitchTo
+@8550dc zoomToImmediate
+@8550ec zoomTo
+@8550f4 zoomOutTo
+@855100 zoomInTo
+@85510c zoomOut
+@855114 zoomIn
+@85526f 4TriangleVolume
+@855320 AggregateVolume
+@855373 4BoxVolume
+@8553ce L=CapsuleVolume
+@855426 L=SphereVolume
+@855a94 ScreenBrightenTexture
+@855aac ScreenTintTexture
+@855ac0 ScreenBlendTexture
+@855ad4 ScreenAdditiveTexture
+@855aec ScreenBackground
+@855b00 ScreenSkyBox
+@855b10 ScreenBrighten
+@855b20 ScreenTint
+@855b2c ScreenBlend
+@855b38 ScreenAdditive
+@855db4 varying 
+@855dc8 float depth;
+
+@855dd8 float4 color3;
+
+@855de8 float4 color2;
+
+@855df8 float4 color1;
+
+@855e08 float4 color;
+
+@855e18 struct cFragCurrent
+{
+
+@855e30 Current.color = In.color;
+
+@855e4c float depth :DEPTH;
+
+@855e64 float4 color3 :COLOR3;
+
+@855e7c float4 color2 :COLOR2;
+
+@855e94 float4 color1 :COLOR1;
+
+@855eac float4 color :COLOR0;
+
+@855ec4 struct cFragOut
+{
+
+@855ed8 Out.depth = Current.depth;
+
+@855ef4 Out.color3 = Current.color3;
+
+@855f14 Out.color2 = Current.color2;
+
+@855f34 Out.color1 = Current.color1;
+
+@855f54 Out.color = Current.color;
+
+@855f70 gl_FragDepth = Current.depth;
+
+@855f90 gl_FragData[3] = Current.color3;
+
+@855fb4 gl_FragData[2] = Current.color2;
+
+@855fd8 gl_FragData[1] = Current.color1;
+
+@855ffc gl_FragColor = Current.color;
+
+@85601c gl_FragData[0] = Current.color;
+
+@856040 Sampler%d
+@85604c extern uniform %s : register(c%d);
+
+@856070 uniform 
+@85607c  : register(s%d);
+
+@856090 extern uniform sampler 
+@8560ac uniform sampler2D 
+@8560c0 register(s%d)
+@8560d0 float vface : VFace;
+
+@8560e8 float2 vpos : VPOS;
+
+@856100 int4 indices :BLENDINDICES0;
+
+@856120 float%d texcoord%d : TEXCOORD%d;
+
+@856144 float4 color1 : COLOR1;
+
+@856160 float4 color : COLOR0;
+
+@856178 float4 binormal : BINORMAL0;
+
+@856198 float4 tangent : TANGENT0;
+
+@8561b4 float4 normal : NORMAL0;
+
+@8561d0 float4 position : POSITION0;
+
+@8561f0 
+struct cFragIn
+{
+
+@856204 void main()
+{
+cFragCurrent Current;
+
+@856230 cFragOut main( cFragIn In )
+{
+cFragCurrent Current;
+cFragOut Out;
+
+@856278 
+return Out;
+}
+
+@856288 SP_Graphics/PSDecls
+@8562fc attribute 
+@856308 Current.pointSize = In.pointSize;
+
+@85632c Current.fog = In.fog;
+
+@856344 Current.weights1 = In.weights1;
+
+@856368 Current.indices1 = In.indices1;
+
+@85638c Current.binormal1 = In.binormal1;
+
+@8563b0 Current.tangent1 = In.tangent1;
+
+@8563d4 Current.normal1 = In.normal1;
+
+@8563f4 Current.position1 = In.position1;
+
+@856418 Current.weights = In.weights;
+
+@856438 Current.indices = In.indices;
+
+@856458 Current.color1 = In.color1;
+
+@856478 Current.binormal = In.binormal;
+
+@85649c Current.tangent = In.tangent;
+
+@8564bc Current.normal = In.normal;
+
+@8564dc Current.position = In.position;
+
+@856500 float4 modelPosition = In.position;
+
+@856528 float pointSize : PSIZE;
+
+@856544 float fog : FOG;
+
+@856558 float4 weights1 : BLENDWEIGHT1;
+
+@85657c int4 indices1 : BLENDINDICES1;
+
+@85659c float4 binormal1 : BINORMAL1;
+
+@8565bc float4 tangent1 : TANGENT1;
+
+@8565dc float4 normal1 : NORMAL1;
+
+@8565f8 float4 position1 : POSITION1;
+
+@856618 float4 weights : BLENDWEIGHT0;
+
+@856638 int4 indices : BLENDINDICES0;
+
+@856658 
+struct cVertIn
+{
+
+@85666c float pointSize;
+
+@856680 float fog;
+
+@85668c float4 weights1;
+
+@8566a0 int4 indices1;
+
+@8566b0 float4 binormal1;
+
+@8566c4 float4 tangent1;
+
+@8566d8 float4 normal1;
+
+@8566ec float4 position1;
+
+@856700 float4 weights;
+
+@856714 int4 indices;
+
+@856724 float%d texcoord%d;
+
+@85673c float4 binormal;
+
+@856750 float4 tangent;
+
+@856764 float4 normal;
+
+@856774 float4 position;
+
+@856788 struct cVertCurrent
+{
+
+@8567a0 float4 binormal : BINORMAL;
+
+@8567c0 float4 tangent : TANGENT;
+
+@8567dc float4 normal : NORMAL;
+
+@8567f8 float4 position : POSITION;
+
+@856818 struct cVertOut
+{
+
+@85682c Out.pointSize = Current.pointSize;
+
+@856850 Out.fog = Current.fog;
+
+@856868 Out.texcoord%d = Current.texcoord%d;
+
+@856890 Out.binormal1 = Current.binormal1;
+
+@8568b4 Out.tangent1 = Current.tangent1;
+
+@8568d8 Out.normal1 = Current.normal1;
+
+@8568f8 Out.binormal = Current.binormal;
+
+@85691c Out.tangent = Current.tangent;
+
+@85693c Out.normal = Current.normal;
+
+@85695c Out.position = Current.position;
+
+@856980 gl_Position = Current.position;
+
+@8569a4 void main()
+{
+cVertCurrent Current;
+
+@8569d0 cVertOut main( cVertIn In )
+{
+cVertCurrent Current;
+cVertOut Out;
+
+
+@856a14 SP_Graphics/VSDecls
+@856c90 float4 lesser_than(float4 a, float4 b) { return a < b; }
+
+@856cd0 float4 is_greater_equal(float4 a, float b) { return greater_equal(a, b); }
+
+@856d1c float4 greater_equal(float4 a, float4 b) { return a >= b; }
+
+@856d5c int toInt(int value) { return value; }
+
+@856d84 float3x3 make_float3x3(float4x4 m) { return (float3x3)m; }
+
+@856dc0 float3x3 make_float3x3(float3x4 m) { return (float3x3)m; }
+
+@856dfc float3x3 make_float3x3(float4x3 m) { return (float3x3)m; }
+
+@856e38 float2 make_float2(float f) { return f; }
+
+@856e64 float3 make_float3(float f) { return f; }
+
+@856e90 float4 make_float4(float f) { return f; }
+
+@856ebc // functions provided for compatability with GLSL output
+
+@856ef8 bool lesser_than(vec4 a, float b) { return any(lessThan(a, vec4(b))); }
+
+@856f48 vec4 tex2Dlod(in sampler2D s, in vec4 tc) { return texture2DLod(s, tc.xy, tc.w); }
+
+@856f9c int toInt(float value) { return int(value); }
+
+@856fcc vec2 fmod(vec2 x, vec2 y)  { return fract(x / y); }
+
+@857008 bool is_greater_equal(vec4 a, float b) { return any(greaterThanEqual(a, vec4(b))); }
+
+@857060 vec4 greater_equal(vec4 a, float b) { return vec4(greaterThanEqual(a, vec4(b))); }
+
+@8570b8 void sincos(in float r, out float s, out float c)  { s = sin(r); c = cos(r); }
+
+@857108 vec3 glsl_cross(in vec3 a, in vec3 b)  { return cross(a, b); }
+
+@857148 void clip(vec4 x)  { if (any(lessThan(x, vec4(0)))) discard; }
+
+@857188 void clip(vec3 x)  { if (any(lessThan(x, vec3(0)))) discard; }
+
+@8571c8 void clip(vec2 x)  { if (any(lessThan(x, vec2(0)))) discard; }
+
+@857208 void clip(float x) { if (x < 0) discard; }
+
+@857234 vec4 ddy(in vec4 v)  { return dFdy(v); }
+
+@857260 vec4 ddx(in vec4 v)  { return dFdx(v); }
+
+@85728c vec2 ddy(in vec2 v)  { return dFdy(v); }
+
+@8572b8 vec2 ddx(in vec2 v)  { return dFdx(v); }
+
+@8572e4 float min(in float v, in int w) { return(min(v,float(w))); }
+
+@857324 float any(in float v) { return(float(v != 0)); }
+
+@857358 float any(in vec4 v) { return(float(any(notEqual(v, vec4(0))))); }
+
+@85739c vec4  saturate(in vec4 v)  { return clamp(v, 0.0, 1.0); }
+
+@8573d8 vec3  saturate(in vec3 v)  { return clamp(v, 0.0, 1.0); }
+
+@857414 vec2  saturate(in vec2 v)  { return clamp(v, 0.0, 1.0); }
+
+@857450 float saturate(in float f) { return clamp(f, 0.0, 1.0); }
+
+@85748c vec4 mul(in float f, in vec4 v)  { return f * v; }
+
+@8574c0 mat4 mul(in mat4 m1, in mat4 m2) { return m2 * m1; }
+
+@8574f8 vec2 mul(in mat2   m, in vec2 v) { return v * m; }
+
+@85752c vec3 mul(in mat3   m, in vec3 v) { return v * m; }
+
+@857560 vec3 mul(in mat3x4 m, in vec4 v) { return v * m; }
+
+@857594 vec4 mul(in mat4   m, in vec4 v) { return v * m; }
+
+@8575c8 vec3 mul(in vec3 v, in mat3   m) { return m * v; }
+
+@8575fc vec4 mul(in vec3 v, in mat3x4 m) { return m * v; }
+
+@857630 vec3 mul(in vec4 v, in mat4x3 m) { return m * v; }
+
+@857664 vec4 mul(in vec4 v, in mat4   m) { return m * v; }
+
+@857698 // functions provided for compatability with HLSL
+
+@8576cc #extension GL_ARB_shader_texture_lod : enable
+
+@8576fc #extension GL_EXT_gpu_shader4 : enable
+
+@857724 #version 120
+
+@857734 samplerCube
+@857740 samplerCUBE
+@85774c glsl_cross
+@85777c textureCube
+@857788 texCUBE
+@857790 texture3D
+@8577a4 texture2DGrad
+@8577b4 tex2Dgrad
+@8577c0 texture2DProj
+@8577d0 tex2Dproj
+@8577dc texture2D
+@8577f0 sampler2D
+@8577fc sampler
+@857824 float2x2
+@857830 mat3x4
+@857838 float3x4
+@857844 mat4x3
+@85784c float4x3
+@857858 float3x3
+@85786c float4x4
+@857880 make_float3x3
+@857890 make_float2
+@85789c make_float3
+@8578a8 make_float4
+@8578d4 float1
+@8578e4 float2
+@8578f4 float3
+@857904 float4
+@85790c sampler2D 
+@857918 extern
+@857928 gl_FrontFacing
+@857940 gl_FragCoord
+@857974 register
+@857980  %s%s;
+
+@857a00 Music_Sync
+@857a0c SP_Global
+@857ac8 Wwise Assert: %s, file: %s, line %i
+@857bc8 multiEmitter
+@857bd8 useEffectDirection
+@857bf8 spatialise
+@857c04 spatialize
+@857c10 threeD
+@857c18 stopWithEffect
+@857c30 sample
+@857c38 locationUpdateRate
+@857d77 =thresh4
+@857d80 thresh2
+@857d8c standard
+@857ea0 MovieEncoder
+@857efc Records and saves a gameplay movie
+@857f20 -record^ <name:cstring> [<time:float>]
+@857f48 Record movie. Either give a time, or run 'movie' again with no arguments to stop.
+@857f9c -size <width:int> <height:int>
+@857fbc Set size for recorded movie
+@857fd8 -quality <float>
+@857fec Set quality for recorded movie, 0-1
+@858010 -fps <float>
+@858020 Set FPS for recorded movie
+@85803c -noUI^
+@858044 Don't record UI
+@858054 -noAudio^
+@858060 Don't record audio
+@858074 -noCrop^
+@858080 Don't crop capture size to be same aspect as source
+@8580d0 couldn't start movie
+
+@8580e8 Stopped playing movie
+
+@858100 Stopped recording movie '%ls'
+
+@858120 SP::AudioRenderer_Wwise Context object
+@858150 VideoRenderable object
+@858168 RWMovie PlaybackRequest Object
+@858188 Subtitle Preload Buffer
+@8581a0 Subtitle Stream Buffer
+@8581b8 Audio Preload Buffer
+@8581d0 Movie Preload Buffer
+@8581e8 Audio Stream Buffer
+@8581fc Movie Stream Buffer
+@858210 rw::movie::SubtitleDecoder object
+@858234 Audio Decoder
+@858244 Alpha Decoder
+@858254 Video Decoder
+@858264 Audio Renderer
+@858274 mVideoDecodeThreadMem
+@85828c VideoRenderableManager object
+@8582ac MovieTimer object
+@8582c8 RWMovie VideoDecoderDesc Object
+@8582e8 RWMovie AudioDecoderDesc Object
+@858308 RWMovie AudioRendererDesc Object
+@85832c   MoviePlayer2::DecodeThreadFcn: Decode: 
+@858358 MoviePlayer2 Decode Thread
+@85842c Generic2D
+@858438 VideoRenderable data buffer
+@858518 Snd::CEALayer3DecF decoder buffer
+@85853c Snd::CEALayer3DecF object
+@858594   VideoDecoder_Vp6::TransferData: 
+@8585b8   VideoDecoder_Vp6::Decode: 
+@8585d8   VideoDecoder_Vp6::DecodeFrameToYUV: 
+@858668 MovieEncoder_Avi: Allocator is NULL - unable to free compression buffer.
+@8586b8 MovieEncoder_Avi: Allocator is NULL - unable to allocate index buffer.
+@858700 AVI Index Buffer
+@858718 MovieEncoder_Avi: Allocator is NULL - unable to allocate index block.
+@858760 AVI Index Block
+@858770 MovieEncoder_Avi: Allocator is NULL - unable to free index buffers.
+@8587b8 MovieEncoder_Avi: Allocator is NULL - unable to allocate compression buffer.
+@858808 AVI Compression Buffer
+@858820 Stopwatch
+@85882c JPEG Encode Buffer
+@858840 VideoEncoder_Jpeg: Cannot invoke SetBytesPerSecond.  Use SetQuality instead.
+@858890 VideoEncoder_Jpeg: Cannot invoke GetBytesPerSecond.  Use GetQuality instead.
+@8588e0 VideoEncoder_Jpeg: Quality must be between 0 and 10000.
+@858918 VideoEncoder_Jpeg: the supplied VideoFrame object has the wrong dimensions.
+@858964 JPEG Line Buffer
+@8589e0 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwfilesysmanager.cpp(302)
+@858a30 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwfilesysmanager.cpp(322)
+@858a80 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwfilesysmanager.cpp(806)
+@858ad0 c:\bf\cm\project\core\rwmovie\source\3rdparty\rwfilesys\private_rwdevice.h(82)
+@858b50 c:\bf\cm\project\core\rwmovie\source\3rdparty\rwfilesys\private_rwhandle.h(30)
+@858bb0 Stopwatch object
+@858bc4 %04d, %12.4f,
+
+@858bd4 %04d, %12.4f -> %12.4f = %12.4f,
+
+@858bf8 -------------------------------------------------------------------------
+@858c44 **Entries log capacity reached.  Increase number of entries**
+@858c84 %12.4f: %s%d
+
+@858c94 <%12.4f : %12.4f> = %12.4f: %s%d
+
+@858cb8 NumberEvents: %5d, TotalDuration: %12.4f ms
+Ave: %12.4f ms = %6.2f Hz
+Min: %12.4f ms = %6.2f Hz
+Max: %12.4f ms = %6.2f Hz
+
+@858d40 EventTag %d is a duration event
+
+@858d68 -------------------------------------------------------------------------
+
+@858db4 Time (ms): 
+
+@858dc4 EVENT LOGGER DUMP ----------------------------------
+@858dfc EventTag %d is not a duration event 
+
+@858e24 RWMovieEventsLog.txt
+@858e58 c:\BF\CM\Project\Core\RWMovie\include\3rdparty\rwfilesys\rw/core/filesys/stream.h(243)
+@858eb8 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwstream.cpp(72)
+@858f00 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwstream.cpp(96)
+@858f48 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwstream.cpp(119)
+@858f90 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwstream.cpp(1122)
+@858ff0 \x%04x
+@85903c EaLayer3DecodedFrame
+@859054 6.1.0.5
+@8590e8 ..\..\..\Core\RWMovie\source\3rdparty\rwfilesys\rwfiledevice.cpp(75)
+@859190 c:\BF\CM\Project\Core\RWMovie\source\3rdparty\rwfilesys\pc/rwpcdriver.cpp(35)
+@859248 c:\BF\CM\Project\Core\RWMovie\source\3rdparty\rwfilesys\pc/rwfilesysmanager.cpp(72)
+@85932c canSeekToEnd
+@85933c audiocodecid
+@85934c audiodelay
+@859358 audiodatarate
+@859368 videocodecid
+@859378 framerate
+@859384 videodatarate
+@859394 height
+@85939c lastkeyframetimestamp
+@8593b4 lasttimestamp
+@8593c4 duration
+@8593d0 onMetaData

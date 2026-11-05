@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>City Renderer Study</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1f22;--muted:#5d6470;--rule:#dcd8cf;--code:#f1eee7;--accent:#2b5d8a;--accent2:#7a4b16}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--fg:#e6e3dc;--muted:#9aa1ab;--rule:#30343a;--code:#1f2226;--accent:#7fb2e0;--accent2:#e0a35a}}
+:root[data-theme="dark"]{--bg:#15171a;--fg:#e6e3dc;--muted:#9aa1ab;--rule:#30343a;--code:#1f2226;--accent:#7fb2e0;--accent2:#e0a35a}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.62 "Iowan Old Style","Palatino Linotype",Georgia,serif;margin:0;padding:0 16px}
+main{max-width:860px;margin:0 auto;padding:48px 0 96px}
+h1{font-size:2rem;line-height:1.2;margin:0 0 .3em}
+h2{font-size:1.35rem;margin:2.4em 0 .6em;border-bottom:1px solid var(--rule);padding-bottom:.25em}
+h3{font-size:1.08rem;margin:1.8em 0 .4em;color:var(--accent)}
+p,li{text-wrap:pretty}
+.meta{color:var(--muted);font-size:.95rem}
+.abstract{border-left:3px solid var(--accent);padding:.4em 1em;margin:1.6em 0;background:var(--code)}
+code,pre{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+code{background:var(--code);padding:.08em .3em;border-radius:3px}
+pre{background:var(--code);padding:12px 14px;border-radius:6px;overflow-x:auto;border:1px solid var(--rule)}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.93rem;display:block;overflow-x:auto}
+th,td{border-bottom:1px solid var(--rule);padding:6px 10px;text-align:left;vertical-align:top}
+th{font-weight:600;color:var(--muted)}
+.eq{font-style:italic;text-align:center;margin:1em 0}
+.fig{margin:1.4em 0;padding:12px;border:1px solid var(--rule);border-radius:8px}
+.fig figcaption{color:var(--muted);font-size:.88rem;margin-top:.6em}
+.pipe{display:flex;flex-wrap:wrap;gap:6px}
+.pipe span{font:12.5px ui-monospace,Menlo,monospace;border:1px solid var(--rule);border-radius:4px;padding:3px 7px;background:var(--code)}
+.pipe span.k{border-color:var(--accent);color:var(--accent)}
+.note{color:var(--muted);font-size:.92rem}
+ol.toc{columns:2;font-size:.95rem}
+@media (max-width:620px){ol.toc{columns:1}body{font-size:15px}}
+@page{size:A4;margin:18mm 16mm 20mm}
+@media print{
+  :root{--bg:#fff;--fg:#111;--muted:#555;--rule:#ccc;--code:#f4f2ee;--accent:#1f4e79;--accent2:#7a4b16}
+  body{padding:0;font-size:10.5pt}
+  main{max-width:none;padding:0}
+  h2{break-after:avoid;margin-top:1.6em}
+  h3{break-after:avoid}
+  pre{white-space:pre-wrap;word-break:break-word;break-inside:avoid;font-size:8.6pt}
+  table{display:table;font-size:9pt;break-inside:auto}
+  tr,.fig,.abstract{break-inside:avoid}
+  tr:first-child{break-after:avoid}
+  table{break-before:auto}
+  p:has(+ table){break-after:avoid}
+  code{font-size:8.8pt}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>Lighting, Shadows, Occlusion and Vegetation in a Deferred City Renderer</h1>
+<p class="meta">Internal research report for the macOS / Apple Metal port &middot; November 2026<br>
+Companion code: <code>../metal/</code> (Metal port), <code>../reference_hlsl/</code> (recovered HLSL), <code>../tools/</code> (extraction).</p>
+
+<div class="abstract"><strong>Abstract.</strong>
+We recovered the complete shader library of a Direct3D&nbsp;9 city-building renderer from its retail data
+packages: 314 vertex and 512 pixel <em>shader fragments</em> in four quality tiers, plus 307 material
+definitions that list which fragments make up each shader. The renderer is a hybrid. A thin G-buffer
+(packed depth, normal, gloss) feeds screen-space passes for shadows, ambient occlusion, local lights and
+fog. Most materials are then shaded forward, reading those buffers back. Indirect light uses no dynamic GI.
+It combines a pre-integrated <em>Perez sky look-up table</em>, CPU-projected spherical harmonics, and
+<em>baked 3-D directional-occlusion volumes</em> that also emit a single tinted bounce. Vegetation runs on a
+three-tier impostor system: meshes, an 8-view normal+depth atlas, and GPU-culled procedural forest cards.
+We describe each technique as implemented, give the maths, and present a Metal port of the parts that matter
+for the macOS version. All six Metal source files compile with the macOS Metal compiler.</div>
+
+<ol class="toc">
+<li>Recovering the shader library</li><li>Fragment-based shader composition</li>
+<li>Frame structure</li><li>Lighting model and sky-based GI</li>
+<li>Shadows</li><li>Directional AO volumes and bounce light</li>
+<li>Vegetation</li><li>Reflections and water</li><li>Atmospherics</li>
+<li>Quality tiers</li><li>Porting to Metal</li><li>Limitations and future work</li>
+</ol>
+
+<h2>1&nbsp; Recovering the shader library</h2>
+<p>The game data ships as DBPF v3 packages. The header holds an index count at <code>0x24</code>, the index size
+at <code>0x2C</code> and a 64-bit index offset at <code>0x40</code>. The index begins with a flags word that marks
+which of <em>type / group / instance-high</em> are constant, followed by 28-byte entries. Payloads are
+RefPack/QFS-compressed (<code>0x10FB</code> signature). <code>tools/dbpf.py</code> implements the index and the
+decompressor.</p>
+<p>All shader data sits under resource type <code>0x0469A3F7</code> in the application package, in four groups
+with instances 0–3 (one per quality tier):</p>
+<table>
+<tr><th>Group</th><th>Size (tier 3)</th><th>Content</th></tr>
+<tr><td><code>0x40212002</code></td><td>1.40&nbsp;MB</td><td>Fragment library: big-endian; <code>u32 3</code>, <code>u32 1024</code>, then 1023 VS slots, <code>u32 1024</code>, 1024 PS slots (slot 0 empty). Each slot is a header, a main-code string, a declaration string, parameters (decl + 12-byte register metadata), PS-only sampler names, and a name.</td></tr>
+<tr><td><code>0x40212004</code></td><td>6.3&nbsp;MB</td><td>Material table (307 entries: supported VS/PS versions, flags, name, VS list, PS list of 26-byte <em>conditional fragment references</em>), followed by 1&nbsp;702 precompiled DX9 SM3 blobs (fxc 9.29.952.3111, with <code>DBUG</code> chunks).</td></tr>
+<tr><td><code>0x40212005</code></td><td>33&nbsp;KB</td><td>Render-pass graph: pass names, render targets and debug views (§3).</td></tr>
+<tr><td><code>0x40212000</code></td><td>22&nbsp;KB</td><td>Small header/lookup table (not needed for reconstruction).</td></tr>
+</table>
+<p>A material reference stores its fragment index in the last two bytes. Vertex indices are 1-based, while pixel
+indices use the raw slot (slot 0 is empty). We confirmed this mapping on several materials where the fragment
+sequence must be coherent. For example, <code>impostorTree</code> resolves to
+<code>unpackNormalTangent → impostorOffscreenInstanceData → impostorTreeVS</code>, which supplies the
+<code>angle</code> variable the next fragment needs. <code>tools/extract_fragments.py</code> writes every fragment
+as an <code>.hlsl</code> file and reassembles every material into one listing per tier.</p>
+<p>The executable also holds the shader builder's <em>prelude</em> (<code>engine_notes/shader_builder_prelude.txt</code>):
+the <code>cVertIn/cVertCurrent/cVertOut</code> and <code>cFragIn/cFragCurrent/cFragOut</code> structures, and helper
+shims (<code>make_float3x3</code>, <code>greater_equal</code>, <code>toInt</code>) emitted for <em>both</em>
+an HLSL back-end and a GLSL back-end (<code>gl_FragData</code>, <code>texture2DLod</code>). In other words, the
+engine already ran its fragments through an OpenGL path, which is useful precedent for a Metal back-end.</p>
+
+<h2>2&nbsp; Fragment-based shader composition</h2>
+<p>Shaders are not written whole. Each fragment is a short code snippet that reads and writes a shared
+<code>Current</code> structure, initialised from <code>In</code> and finally copied to <code>Out</code>.
+Interpolators are named symbolically (<code>Current.texcoord&lt;t2&gt;</code>) and samplers likewise
+(<code>Sampler&lt;s1&gt;</code>). The builder assigns physical registers. Each fragment declares its uniforms with
+register metadata, so the builder can pack constants without collisions. A material lists candidate fragments,
+and a 24-byte condition mask on each entry (vertex components present, instancing, shadow/deferred pass,
+data-view mode) decides which ones are spliced in. This one mechanism yields every permutation: forward vs
+deferred, instanced vs batched, skinned vs static.</p>
+<pre><code>// material "NonImpostorTree" (tier 3)
+VS: whiteVertexColor, copyUV01Tree, worldSpaceNormalTangent, setupSHTangent, shLightingDiffSpec9, toClipSpace
+PS: deferredDiffuseDisabled, sampleTreeTextures, setupSHTangent, scLightingApplyNMap</code></pre>
+<p class="note">Porting implication: on Metal the natural equivalent is a code generator that emits MSL from the same
+fragment graph, with function constants for the condition masks. The hand-written files in <code>metal/</code>
+are the fixed, readable form of the most important permutations.</p>
+
+<h2>3&nbsp; Frame structure</h2>
+<p>The pass graph (<code>engine_notes/render_pipeline_passes_and_targets.txt</code>) runs in this order:</p>
+<div class="fig"><div class="pipe">
+<span>terrain / grass / paths</span><span>batchedModels</span><span>terrainShadows</span><span>water · waterHD</span>
+<span>impostors · impostorShadows · cityImpostors</span><span>lots</span><span class="k">shadows</span><span class="k">forest</span>
+<span class="k">atmospherics</span><span>dof</span><span>motionBlur</span><span>bloom</span><span>tonemap</span><span>clut</span><span>fxaa</span><span>temporalSSAA</span><span>ui</span>
+</div>
+<figcaption>Main pass order. Render targets include <code>depth</code>, <code>normal</code>, <code>diffuse</code>,
+<code>lightScalar</code>, <code>shadowMapDepthRT/ColorRT</code>, <code>HDRColor</code> (+ half/quarter res),
+<code>waterRefraction</code>, <code>fftA0–4/fftB0–4</code> and <code>waterHeight/Normals/Choppy</code>. Config switches:
+<code>configCascadedShadows, configCloudShadows, configAoShadows, configAoTerrainOntoWorld, configVolumetricLight, configAtmospherics</code>.</figcaption></div>
+<p>The G-buffer is minimal and LDR-friendly. Depth is packed into RGB8 (<code>dot(rgb, (1, 1/255, 1/255²))</code>)
+with spec power in A. Normal sits in RGB8 with gloss in A. The two key intermediates are <code>lightScalar</code>
+(R = sun shadow, G = ambient occlusion, both screen-space) and a light-accumulation buffer for deferred
+point/spot/line lights (rgb diffuse, a = specular). Materials consume both in a forward pass. In effect this is a
+<em>light pre-pass</em> renderer that keeps forward-shaded materials.</p>
+
+<h2>4&nbsp; Lighting model and sky-based GI</h2>
+<h3>4.1 Perez sky look-up table</h3>
+<p>Sky radiance follows the Perez/Preetham model in CIE xyY:</p>
+<p class="eq">Y(θ,γ) = (1 + A·e<sup>B/cosθ</sup>) · (1 + C·e<sup>Dγ</sup> + E·cos²γ) · Y<sub>z</sub></p>
+<p>The shipping path does not evaluate the exponentials. A 2-D table (sampler s11) stores the θ term along
+<code>c = ½(cosθ+1)</code> and the γ term along <code>g = √(½(1−cosγ))</code>, quantised to 8 bits and
+dequantised with <code>sunSkyRadianceScales</code>. Rows <code>s ∈ {0,⅓,⅔,1}</code> hold progressively
+<em>convolved</em> versions of the sky, which gives glossy and diffuse pre-filtering from one 2-D texture.
+Saturation and luminance are tuned around the white point and converted to linear RGB with a fixed XYZ→RGB matrix.</p>
+<h3>4.2 SceneLighting composite</h3>
+<p>Nearly every lit material ends in one function (<code>Common.h: SceneLighting</code>):</p>
+<pre><code>dir     = lerp(N, reflect(V,N), 0.75·gloss)          // one LUT tap
+diff    = SkyConv(dir, 1-s)·(1-s)·AO ;  spec = SkyConv(dir,1-s)·s·AO
+sunTerm = pow(saturate(N·L), 1+gloss) · sunColor · shadow
+hilite  = BlinnPhongNorm(N,H,e) · Schlick(F0) · specStrength · N·L · sunColor · shadow
+diff   += sunTerm + lightBuffer.rgb ;  spec += lightBuffer.a
+color   = albedo · (diff + spec) + hilite</code></pre>
+<p>Specular is energy-normalised Blinn-Phong (<code>(e+2)/8</code>) with Schlick Fresnel, approximated as
+<code>exp2(−8.65617·L·H)</code>. A <code>ClipToHemisphere(n, n<sub>g</sub>)</code> helper bends the lookup
+direction toward a ground plane so terrain-hugging objects don't pick up light from below.</p>
+<h3>4.3 Spherical harmonics</h3>
+<p>The low tier, the effects, and close-range trees use 9-coefficient SH evaluated per vertex. Bands 1–2 are
+convolved with the cosine lobe (Â₁ = 2/3, Â₂ = 1/4) for diffuse, and evaluated <em>unconvolved</em> along R
+for the glossy term. A 16-coefficient variant adds the cubic band per pixel for sharper reflections. The CPU
+projects the same Perez sky into SH, so both paths match.</p>
+
+<h2>5&nbsp; Shadows</h2>
+<p>Sun shadows are rendered into an R-channel linear-depth map, <code>(z<sub>cam</sub> − near)/(far − near)</code>.
+Alpha-tested casters and tree cards reconstruct per-texel depth. Receivers never sample the shadow map in their
+own shaders. Instead, a full-screen <code>globalShadowShader</code> rebuilds world position from the G-buffer
+(<code>camPos + farRay · depth</code>, with the ray interpolated without perspective correction) and writes the
+filtered result into <code>lightScalar.x</code>. The source defines eight filter styles:</p>
+<table>
+<tr><th>Style</th><th>Method</th><th>Use</th></tr>
+<tr><td>2</td><td>Single compare</td><td>fallback</td></tr>
+<tr><td>3</td><td>Manual 2×2 bilinear PCF</td><td>generic SM2</td></tr>
+<tr><td>4 / 5</td><td>ATI Fetch4: bilinear PCF / four Fetch4 ≈ 4×4 Gaussian</td><td>ATI hardware</td></tr>
+<tr><td>6</td><td>Hardware PCF (<code>tex2Dproj</code>)</td><td>NVIDIA</td></tr>
+<tr><td><strong>7</strong></td><td>Four hardware-PCF taps at ±0.5 texel, weight ¼</td><td>shipping: fragment <code>renderShadowOrtho<i>N</i></code> uses style <i>N</i>, and <code>renderShadowOrtho7</code> is the only one any material references (<code>globalShadowShader</code>, <code>globalLightsShader</code>)</td></tr>
+<tr><td>8</td><td>Receiver-plane depth bias (Isidoro); commented “doesn't work”</td><td>disabled</td></tr>
+</table>
+<p>Every style ends with <code>shadow *= shadow</code> (“plump, smooth, and darken shadow (important!)”). Squaring
+narrows the penumbra of the small kernel and deepens contact shadows. On Metal, style 6/7 maps to
+<code>depth2d::sample_compare</code> and styles 4/5 map to <code>gather()</code> (swizzle <code>.wzxy</code> for D3D's
+<code>.agbr</code>).</p>
+<p><strong>Cloud shadows</strong> multiply three tiled cloud textures at 200/230/350 m altitude into the same buffer.
+Each layer is projected along the sun direction and scrolled at its own velocity, combined as
+<code>0.45 + 0.55·saturate(c₁.g + c₂.b − ½c₀.r)</code>. <strong>Forest canopy shadow</strong> on terrain is a single
+tap of the forest mask offset 0.0025 UV toward the sun, darkening by 0.9: an inexpensive soft canopy shadow
+with no shadow-map cost.</p>
+
+<h2>6&nbsp; Directional AO volumes and bounce light</h2>
+<p>The renderer does not use screen-space AO. Each building carries a small 3-D texture baked offline. Each voxel
+stores the mean occluder direction <b>d</b> (RGB) and the occluded solid angle <i>w</i> as a fraction of the
+sphere (A; 0.5 = hemisphere). At runtime the volume's box is rasterised. Each pixel reconstructs its volume UVW
+from depth, offsets it along the normal by <code>tuning.z</code> voxels to avoid self-occlusion, and evaluates the
+cosine-weighted visible fraction of a spherical cap:</p>
+<pre><code>c0 = 1 − 2w ;  s0 = √(1 − c0²) ;  t = saturate((N·(−d) + s0) / 2s0)
+F  = lerp( saturate(−c0)², 1 − saturate(c0)², t )        // ProjSolidAngle
+AO = 1 − (1 − F·k_s)^k_c                                  // artist curve</code></pre>
+<p>The same file ships <code>CombineOverlap</code>, which merges two directed caps by interpolating between
+w₀+w₁ and max(w₀,w₁) according to their angular overlap. <code>BendNormal</code> derives a bent normal. These
+are the tools used to bake and merge volumes. The <em>AndBounce</em> variant writes <code>0.7·AO·tint</code>
+into the light buffer. Light blocked by a coloured building is re-emitted in that building's colour, which is a
+cheap one-bounce GI term. <strong>Terrain onto world</strong> (<code>applyTerrainAOToWorld</code>) fakes occlusion
+from the ground: occluded angle = ½·(1 − saturate(Δz/6 m))², with the occluder direction pointing straight down.</p>
+
+<h2>7&nbsp; Vegetation</h2>
+<h3>7.1 Three tiers</h3>
+<table>
+<tr><th>Tier</th><th>Material</th><th>Technique</th></tr>
+<tr><td>Near</td><td><code>NonImpostorTree</code></td><td>Mesh; diffuse·AO texture; normal map; SH9 per vertex + sky composite per pixel</td></tr>
+<tr><td>Atlas</td><td><code>impostorTree</code></td><td>Each species is rendered from 8 view angles into an atlas: pre-multiplied colour, packed normal+depth, AO</td></tr>
+<tr><td>Far / forest</td><td><code>treeParticleStandard/ForestCamFacing</code></td><td>Camera-facing cards that sample the atlas column chosen by facing direction; per-pixel lighting from the atlas normal</td></tr>
+</table>
+<h3>7.2 Impostor atlas</h3>
+<p><code>impostorTreeVS</code> rotates the mesh by <code>transform[angle]</code>, moves it into camera space,
+normalises it to the [−1,1] cell, then scales and offsets it into atlas cell <i>angle</i>. The PS clips to the cell and
+writes:</p>
+<ul>
+<li><b>Colour</b> = diffuse·AO.rgb, alpha = <code>diffuse.a · saturate(100·(AO.a − leavesFallen) + 1)</code>. AO.a stores a per-leaf age, so one scalar animates foliage loss for seasons, pollution and dying trees.</li>
+<li><b>Normal+depth</b> in RGB8: xy = normal.xy·½+½, z = ½ + sign(n.z)·½·depth. Unpacking rebuilds n.z = ±√(1−x²−y²) and recovers the depth. This gives cards per-pixel depth, which they use for depth output and shadow casting.</li>
+</ul>
+<h3>7.3 Procedural forests on the GPU</h3>
+<p>Forest cards come from a fixed grid of quads. The <em>vertex</em> shader decides whether each tree exists, using
+three textures:</p>
+<pre><code>density = ecoMap.y(uv)
+size    = density − sampleIndex          // stratified threshold per card
+angle   = |N · normalize(N.xy,0)|        // terrain steepness
+draw    = size>0 &amp;&amp; angle&lt;0.5 &amp;&amp; height ≥ seaLevel + 8.5 m
+scale   = lerp(0.3, 0.9, size) + frac(random)·0.05
+corner *= draw                           // culled quads collapse to a point</code></pre>
+<p>Because <code>sampleIndex</code> is stratified per card, raising the eco-map density switches cards on
+smoothly, and the surplus becomes tree size. Painting or bulldozing forest therefore costs only a texture update.</p>
+<h3>7.4 Card geometry</h3>
+<p>Cards are expanded in camera space. A <em>parallax fix</em> rescales the projected xy by
+<code>w / (w − camOffset.z · P[2].w)</code>, so a card offset in depth projects as if it sat at the tree's centre.
+A per-model z-bias (<code>−1e-5·w</code>) orders overlapping cards. Cards shrink vertically when viewed from above
+(<code>saturate(dot(−camDir, up)) + distanceFade</code>) and fade between 3000 and 3750 m. The wind function
+(<code>CalculateTreeWindAnimation</code>: travelling wave, <code>sin(√t)</code> easing, decaying envelope) is
+present but compiled out with <code>if(false)</code>.</p>
+<h3>7.5 Colour variation and lighting</h3>
+<p>Each of four tree types holds an HSV range (<code>terrainForestInfoPS[4]</code>), lerped by vertex colour and
+applied in YIQ space: a hue rotation of the IQ chroma plane, then a saturation scale on IQ and a value scale on
+all three channels. This produces seasonal and species variety from one atlas. The atlas is sampled with a manual
+mip level (<code>½·log₂</code> of the footprint, clamped to 5) to stop neighbouring cells from bleeding into each
+other. Colour is then un-premultiplied, and the card is lit by <code>SceneLighting</code> with a fixed foliage
+material: gloss 0.08, exponent 3, strength 0.2. <code>treeBirth</code> grows new trees in two phases: the trunk
+first (30% of the time), then the crown widens from 10% bottom-up.</p>
+
+<h2>8&nbsp; Reflections and water</h2>
+<p>The renderer has no planar or screen-space-traced reflections. Reflections come from three sources: sky LUT
+lookups along R for every glossy material and for water, a static cube map on vehicles
+(<code>lerp(c, cube(R), 0.15·specStrength)</code>), and water refraction of the HDR buffer.</p>
+<p><b>HD water</b> uses an FFT ocean (<code>initFFT → FFTX → FFTY → WaterHeight/Choppy/Normals</code>). The vertex
+shader displaces a terrain-style grid vertically and also horizontally (choppy), clamped never to rise above sea
+level. The normal pass builds a coarse normal from three height taps and re-orients two tiled detail normal maps
+onto it. The surface shader combines:</p>
+<ul>
+<li>a stylised Fresnel, <code>clamp(0.925 − (5cos²θ)<sup>¼</sup>, 0.01, 1)</code>;</li>
+<li>sky reflection along reflect(−V,N), plus Phong sun glints;</li>
+<li>screen-space refraction offset by <code>0.03·sin(πN.xy)</code>, rejected (and re-sampled unrefracted) when the refracted pixel lies in front of the water;</li>
+<li>depth-based absorption toward a dark basin colour over 70 m of water;</li>
+<li>shoreline foam whose depth comes from a ring of 8 terrain-height taps. Foam fades with distance (2–10 km) and suppresses specular.</li>
+</ul>
+
+<h2>9&nbsp; Atmospherics</h2>
+<p>A full-screen pass adds aerial perspective. Extinction integrates exponential height fog along the ray in
+closed form, <code>K(e<sup>−α h<sub>p</sub></sup> − e<sup>−α h<sub>v</sub></sup>)</code> with <code>K = B₀/(α·cosθ)</code>. It is
+applied as <code>τ = e<sup>−d²</sup></code>: the quadratic optical depth keeps the near field clear. Two layers come from
+the weather system (<code>mDynamicWeather</code>), one for geometry and one for the sky dome. In-scatter colour is
+the sky LUT along the view ray, with the horizon lifted near the sun. Commented alternatives include a
+“Crytek-style” volumetric density and an auto-scaling density.</p>
+
+<h2>10&nbsp; Quality tiers</h2>
+<p>All four tiers share the same fragment names. Tier 0 (shader model 2 header <code>fffe0200</code>) differs from
+tier 3 in 1 VS and 59 PS fragments. It uses <code>half</code> precision in the sky/env code, drops the
+<code>lightScalar</code> read (no screen-space shadow or AO in the composite), skips impostor normal mapping, and
+skips the top-down card flattening on forests. Tiers 1–3 differ only slightly from one another.</p>
+
+<h2>11&nbsp; Porting to Metal</h2>
+<table>
+<tr><th>Issue</th><th>Resolution in <code>metal/</code></th></tr>
+<tr><td>Row-vector <code>mul(v,M)</code> with column-packed constants</td><td>Upload the same bytes; use <code>v * M</code> (<code>float4x4</code>, and <code>float3x4</code> for HLSL <code>float4x3</code>). No CPU transposes.</td></tr>
+<tr><td>Packed RGB8 depth / normal+depth</td><td>Kept bit-exact (<code>UnpackDepth</code>, <code>PackDepth24</code>, impostor pack). Later, move to <code>r32Float</code>/<code>rg16Snorm</code> targets on Apple GPUs (tile memory makes the G-buffer cheap).</td></tr>
+<tr><td>Fetch4 / HW PCF</td><td><code>gather()</code> and <code>depth2d::sample_compare</code> with a <code>compare_func::less_equal</code> sampler.</td></tr>
+<tr><td><code>VPOS</code> + half-pixel offset</td><td>Metal <code>[[position]]</code> is already at pixel centres; the D3D9 <code>+0.5</code> is dropped.</td></tr>
+<tr><td>Fragment splicing &amp; conditions</td><td>Recommended: generate MSL from the fragment graph; map condition masks to <code>[[function_constant]]</code>s.</td></tr>
+<tr><td>Engine-injected macros (<code>FOAM_*</code>, <code>WATER_*</code>)</td><td>Not present in data; placeholder constants in <code>ReflectionsWater.metal</code> must be replaced with the engine values.</td></tr>
+<tr><td>Light pre-pass round trip</td><td>On Apple silicon, use programmable blending / imageblocks so lightScalar and the light buffer never leave tile memory.</td></tr>
+</table>
+<p>Ported entry points (all compile with <code>swift tools/validate_metal.swift metal</code>):</p>
+<table>
+<tr><th>File</th><th>Functions</th></tr>
+<tr><td>Common.h</td><td>Perez sky LUT, SceneLighting, SH9/SH16, Blinn-Phong-Schlick, solid-angle AO maths, YIQ HSV tweak, packing</td></tr>
+<tr><td>Trees.metal</td><td>treeParticleStandardVS, treeParticleForestVS, treeParticleForestPS, treeParticleDeferredPS, treeParticleShadowPS, impostorTreeVS/PS, TreeBirth, ForestGroundShadow</td></tr>
+<tr><td>Shadows.metal</td><td>renderShadowMapVS/PS, alpha-mask caster, ShadowOrtho/Proj (styles 2–7), globalShadowPS, cloudShadowPS</td></tr>
+<tr><td>AmbientOcclusion.metal</td><td>aoVolumeVS/PS (AO + bounce MRT), applyTerrainAOToWorldPS</td></tr>
+<tr><td>GlobalIllumination.metal</td><td>shLightingDiffSpec9VS, shLightingGlossy16PS, sceneLightingApplyPS, pointLightPS, globalLightsPS</td></tr>
+<tr><td>ReflectionsWater.metal</td><td>hdWaterVS, hdWaterNormalPS, hdWaterPS, VehicleReflection</td></tr>
+<tr><td>Atmospherics.metal</td><td>atmosphericsPS</td></tr>
+</table>
+
+<h2>12&nbsp; Limitations and future work</h2>
+<ul>
+<li>The 24-byte condition masks are recorded but not fully decoded. The assembled material listings include every candidate fragment, with its mask, rather than one resolved permutation.</li>
+<li>Constant values set by the CPU (SH coefficients, Perez coefficients, AO tuning, parallel lights) are not in the shader data. They need a capture from the running game.</li>
+<li>The precompiled DX9 blobs were not disassembled. Their HLSL sources are available, and the blobs serve as a ground truth for register allocation if the MSL generator needs it.</li>
+<li><code>globalLightsPS</code> in the port reconstructs the per-light loop that the original splits across <code>parallelLight{N}*</code> fragments. Its fill-light term is our reading of the uniforms, not recovered code.</li>
+<li>Pixel-exact validation against D3D9 captures is the next step once a Metal host harness exists.</li>
+</ul>
+</main>
+</body>
+</html>
